@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width,initial-scale=1.0">
+	
+		<title></title>
+		<link rel="stylesheet" type="text/css" href="css.css"/>
+	</head>
+	<body>
+		<!--/*头部*/-->
+		<div class="h-head">
+			<img src="logo.png"/>
+		</div>
+		<!--//导航栏-->
+		<div id="nav">
+			<div id="scoll">
+				<ul>
+					<li id="top">头条</li>
+					<li id="shehui">社会</li>
+					<li id="guonei">国内</li>
+					<li id="guoji">国际</li>
+					<li id="yule">娱乐</li>
+					<li id="tiyu">体育</li>
+					<li id="junshi">军事</li>
+					<li id="keji">科技</li>
+					<li id="caijing">财经</li>
+					<li id="shishang">时尚</li>
+				</ul>
+			</div>
+		</div>
+		<!--//新闻内容-->
+		<div id="content">
+			
+		</div>
+	</body>
+</html>
+<script type="text/javascript" src="jquery-3.1.0.js"></script>
+<script type="text/javascript" src="db.js"></script>
+<script type="text/javascript" src="template-native-debug.js"></script>
+<script type="text/html" id="newstemp">	
+		<a href="<%=url%>" class="ui-news-li">
+			<div class="ui-news-info">
+				<h3><%=title%></h3>
+				<p class="f01"><%=author_name%>&nbsp;&nbsp;&nbsp;<%=date%></p>
+			</div>
+			<img src="<%=thumbnail_pic_s%>" width="107px" height="107px"/>
+		</a> 
+</script>
+<script type="text/javascript">
+	var name="shishang";
+	var schemas = {
+		top:0,
+		shehui:0,
+		guonei:0,
+		guoji:0,
+		yule:0,
+		tiyu:0,
+		junshi:0,
+		keji:0,
+		caijing:0,
+		shishang:0
+	};
+	//获取头条内容
+	initDatabase(schemas,function(){
+		a(name);
+	});
+	//设置滚动条宽度
+	var ws =parseFloat($("#scoll ul li").innerWidth())*10;
+	$("#scoll").width(ws);
+	//导航栏在PC上的拖动
+	isTouchDevice();
+	//触摸开始
+	var startX = 0;
+	function touchStartFunc (evt) {
+		var touch = evt.touches[0];
+		startX = parseFloat(touch.pageX);
+	}
+	//触摸移动，它会被执行到多次
+	function touchMoveFunc (evt) {
+		var touch = evt.touches[0];
+		var x = parseFloat(touch.pageX);
+		var offset = x - startX;//移动的距离
+		startX = x;
+		var val = parseFloat($('#scoll').css('left'));//获取scoll的当前位置
+		var newLeft = val + offset;
+		if(newLeft>=0){
+			$('#scoll').css("left",0);
+		}
+		else if(newLeft<$("#nav").innerWidth()-$("#scoll").innerWidth()){
+			$("#scoll").css("left",$("#nav").innerWidth()-$("#scoll").innerWidth());
+		}
+		else{
+			$('#scoll').css("left",newLeft);
+		}
+
+	}
+	//结束触摸
+	function touchEndFunc (argument) {
+		startX = 0;
+	}
+
+	//绑定事件
+	function bindEvent () {
+		var nav = document.getElementById("nav");
+		nav.addEventListener('touchstart',touchStartFunc,false);
+		nav.addEventListener('touchmove',touchMoveFunc,false);
+		nav.addEventListener('touchend',touchEndFunc,false);
+		
+	}
+	//手机上的滑动导航栏
+	function isTouchDevice(){
+		//判断浏览器是否支持触摸事件
+		try{
+			document.createEvent("TouchEvent");
+			bindEvent();//绑定事件
+		}
+		catch(e){
+				//实现导航栏在PC的拖动
+			$("#scoll").mousedown(function(event) {
+				var spaceX = event.pageX-this.offsetLeft;
+				$(document).mousemove(function(event) {
+					if($("#nav").innerWidth()-$("#scoll").innerWidth()<0){
+						var nleft = event.pageX - spaceX;
+						$("#scoll").css("left",nleft);
+
+						if(nleft>=0){
+							$("#scoll").css("left",0);
+						}
+						else if(parseFloat($("#scoll").css("left"))< $("#nav").innerWidth()-$("#scoll").innerWidth()){
+							$("#scoll").css("left",$("#nav").innerWidth()-$("#scoll").innerWidth());
+						}
+					}		
+					//来清楚选中内容
+				window.getSelection ? window.getSelection().removeAllRanges(): document.selection.empty();
+				});
+
+				$(document).mouseup(function(event) {
+					$(this).off("mousemove");
+				});
+			});
+		}
+		
+	}
+	
+	//请求数据的方法
+	 function a(key){
+	 	$('#content').html("<div class='moon'></div><div class='container'><div class='person'><div class='head'></div><div class='part arm one'></div><div class='part arm two'></div><div class='torso'></div><div class='part leg one'></div><div class='part foot one'></div><div class='part leg two'></div><div class='part foot two'></div></div></div>")
+	 	$.ajax({
+			type:"get",
+			url:"juhe.php?type="+key,
+			async:true,
+			dataType:"json",
+			success:function(data){
+				//数据库的保存
+				//数据添加
+				addNews(name,data.result.data,function(){
+					queryMax(name,function(max){
+						schemas[name]=max;
+						fetchNew(name,schemas[name],5,function(data){
+							var l=data.length;
+							schemas[name]=schemas[name]-l;
+							$('#content').html('')
+							for(var i=0;i<l;i++){
+								var html=template("newstemp",data[i]);
+								$('#content').append($(html));
+							}
+							var div = $("<div id='more'>点击加载更多</div>");
+							$("#content").append(div)
+							div.click(loadmore);
+						})
+					})
+				});
+			}
+		});
+	 }
+	 function loadmore(){
+	 	fetchNew(name,schemas[name],5,function(data){
+				var l=data.length;
+				schemas[name]=schemas[name]-l;
+				for(var i=0;i<l;i++){
+					var html=template("newstemp",data[i]);
+					$('#more').before($(html));
+				}
+		});
+	 }
+	 //点击列表切换新闻内容
+	 $('#scoll ul li').click(function(event){
+	 	$('#scoll ul li').css("color","black");
+	 	$(this).css("color","red");
+	 	name =event.target.id;
+	 	a(name);
+	 })
+</script>
+
+
+ 
